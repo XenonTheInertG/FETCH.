@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/get_url.py": {
+      "maxDuration": 30
+    }
+  }
+}
