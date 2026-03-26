@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FETCH — YT Downloader</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --surface: #111113;
+    --border: #1f1f24;
+    --accent: #c8f135;
+    --accent2: #f13561;
+    --text: #e8e8ec;
+    --muted: #5a5a6a;
+    --card: #14141a;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(200,241,53,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,241,53,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+    margin-bottom: 44px;
+  }
+  .logo {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 2.4rem;
+    letter-spacing: -2px;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .logo span { color: var(--accent2); }
+  .tagline { font-size: 0.6rem; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; }
+
+  /* Label */
+  .label { font-size: 0.6rem; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: block; }
+
+  /* URL bar */
+  .url-row { display: flex; gap: 10px; margin-bottom: 8px; }
+  .url-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    padding: 13px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .url-input:focus { border-color: var(--accent); }
+  .url-input::placeholder { color: var(--muted); }
+
+  /* Buttons */
+  .btn {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 13px 22px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+  .btn-accent { background: var(--accent); color: #000; }
+  .btn-accent:hover:not(:disabled) { background: #d9ff3d; transform: translateY(-1px); }
+  .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .btn-ghost:hover:not(:disabled) { background: rgba(200,241,53,0.08); }
+  .btn-dl {
+    background: var(--accent2);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+    padding: 14px;
+    font-size: 0.8rem;
+  }
+  .btn-dl:hover:not(:disabled) { background: #ff1f55; transform: translateY(-1px); }
+
+  /* Status */
+  .status-bar { display: flex; align-items: center; gap: 8px; font-size: 0.68rem; color: var(--muted); min-height: 26px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+  .dot.spin { background: var(--accent); animation: pulse 0.9s infinite; }
+  .dot.err { background: var(--accent2); }
+  .dot.ok { background: var(--accent); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Error */
+  .err-box { display: none; background: rgba(241,53,97,0.07); border: 1px solid var(--accent2); color: var(--accent2); padding: 12px 16px; font-size: 0.76rem; margin-bottom: 20px; }
+
+  /* Info card */
+  #info-card {
+    display: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 18px;
+    margin-bottom: 24px;
+    animation: fadeUp 0.3s ease;
+  }
+  .info-inner { display: flex; gap: 18px; align-items: flex-start; }
+  .thumb { flex-shrink: 0; width: 130px; height: 74px; object-fit: cover; border: 1px solid var(--border); }
+  .video-title { font-family: var(--sans); font-size: 0.98rem; font-weight: 700; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; }
+  .meta-item { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .meta-item b { color: var(--text); font-weight: 400; }
+
+  /* Tabs */
+  #format-section { display: none; margin-bottom: 24px; animation: fadeUp 0.3s ease; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); font-family: var(--mono); font-size: 0.68rem;
+    letter-spacing: 2px; text-transform: uppercase;
+    padding: 8px 18px 10px; cursor: pointer; transition: all 0.15s; margin-bottom: -1px;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* Format grid */
+  .fmt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+  .fmt-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 11px 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .fmt-card:hover { border-color: var(--accent); background: rgba(200,241,53,0.04); }
+  .fmt-card.active { border-color: var(--accent); background: rgba(200,241,53,0.09); }
+  .fmt-name { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+  .fmt-size { font-size: 0.62rem; color: var(--muted); }
+  .badge {
+    display: inline-block; font-size: 0.52rem; letter-spacing: 1px;
+    text-transform: uppercase; padding: 2px 5px; border-radius: 2px;
+    font-weight: 700; width: fit-content; margin-bottom: 2px;
+  }
+  .badge-video { background: rgba(200,241,53,0.15); color: var(--accent); }
+  .badge-audio { background: rgba(241,53,97,0.15); color: var(--accent2); }
+  .badge-combined { background: rgba(100,180,255,0.15); color: #64b4ff; }
+
+  /* Notice */
+  .notice {
+    display: none;
+    background: rgba(100,180,255,0.06);
+    border: 1px solid rgba(100,180,255,0.2);
+    color: #64b4ff;
+    font-size: 0.68rem;
+    padding: 10px 14px;
+    margin-top: 14px;
+    line-height: 1.6;
+  }
+
+  /* Download panel */
+  #dl-panel {
+    display: none;
+    margin-bottom: 24px;
+    animation: fadeUp 0.3s ease;
+  }
+  .dl-meta { font-size: 0.7rem; color: var(--muted); margin-bottom: 14px; line-height: 1.8; }
+  .dl-meta b { color: var(--text); font-weight: 400; }
+  .expire-bar {
+    height: 2px;
+    background: var(--border);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .expire-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 100%;
+    transition: width 1s linear;
+  }
+  .expire-note { font-size: 0.62rem; color: var(--muted); margin-bottom: 14px; }
+  #expire-time { color: var(--accent); }
+
+  .dl-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* Footer */
+  footer { text-align: center; font-size: 0.58rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--border); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+
+  @media (max-width: 520px) {
+    .logo { font-size: 1.9rem; }
+    .info-inner { flex-direction: column; }
+    .thumb { width: 100%; height: 110px; }
+    .url-row { flex-direction: column; }
+    .fmt-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div>
+      <div class="logo">FETCH<span>.</span></div>
+      <div class="tagline" style="margin-top:5px">No-storage YT Downloader</div>
+    </div>
+    <div class="tagline">direct link</div>
+  </header>
+
+  <!-- URL Input -->
+  <div style="margin-bottom:32px">
+    <span class="label">// paste youtube url</span>
+    <div class="url-row">
+      <input id="url-input" class="url-input" type="text" placeholder="https://youtube.com/watch?v=..." />
+      <button id="fetch-btn" class="btn btn-accent" onclick="fetchInfo()">FETCH</button>
+    </div>
+    <div class="status-bar">
+      <div id="dot" class="dot"></div>
+      <span id="status">Ready</span>
+    </div>
+  </div>
+
+  <div id="err-box" class="err-box"></div>
+
+  <!-- Info Card -->
+  <div id="info-card">
+    <div class="info-inner">
+      <img id="thumb" class="thumb" src="" alt="" />
+      <div style="flex:1;min-width:0">
+        <div id="vtitle" class="video-title"></div>
+        <div class="meta">
+          <div class="meta-item">Channel <b id="m-channel">—</b></div>
+          <div class="meta-item">Duration <b id="m-dur">—</b></div>
+          <div class="meta-item">Views <b id="m-views">—</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Format Section -->
+  <div id="format-section">
+    <span class="label">// choose format</span>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('video',this)">VIDEO</button>
+      <button class="tab" onclick="switchTab('audio',this)">AUDIO ONLY</button>
+    </div>
+    <div id="fmt-grid" class="fmt-grid"></div>
+    <div id="notice" class="notice">
+      ℹ <b>Video-only</b> formats don't include audio — they're separate streams. Pick a <b>combined</b> format for audio+video in one file, or use Audio Only tab for music.
+    </div>
+  </div>
+
+  <!-- Download Panel -->
+  <div id="dl-panel">
+    <div class="dl-meta">
+      Selected: <b id="dl-sel">—</b><br/>
+      This is a <b>direct CDN link</b> from YouTube. Your browser downloads straight from their servers — nothing passes through this app.
+    </div>
+    <div class="expire-bar"><div id="expire-fill" class="expire-fill"></div></div>
+    <div class="expire-note">Link expires in <span id="expire-time">6:00</span> — click download before it does</div>
+    <div class="dl-actions">
+      <a id="dl-link" href="#" class="btn btn-dl" download onclick="handleDownload(event)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        DOWNLOAD
+      </a>
+      <button class="btn btn-ghost" onclick="resetAll()">RESET</button>
+      <button class="btn btn-ghost" onclick="goBack()">← BACK</button>
+    </div>
+  </div>
+
+  <footer>fetch · direct link, zero storage · for personal use only</footer>
+</div>
+
+<script>
+  let allFormats = [], selectedFmt = null, activeTab = 'video';
+  let expireTimer = null, expireSeconds = 360;
+
+  // ── Utils ─────────────────────────────────────────────────────────────
+  function setStatus(txt, state='idle') {
+    document.getElementById('status').textContent = txt;
+    const d = document.getElementById('dot');
+    d.className = 'dot' + (state==='spin' ? ' spin' : state==='err' ? ' err' : state==='ok' ? ' ok' : '');
+  }
+  function showErr(msg) {
+    const b = document.getElementById('err-box');
+    b.textContent = '⚠ ' + msg;
+    b.style.display = 'block';
+    setStatus('Error', 'err');
+  }
+  function clearErr() { document.getElementById('err-box').style.display = 'none'; }
+  function show(id, flex=false) { document.getElementById(id).style.display = flex ? 'flex' : 'block'; }
+  function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+  function fmtDur(s) {
+    if (!s) return '—';
+    const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+    return h ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}` : `${m}:${String(sec).padStart(2,'0')}`;
+  }
+  function fmtSize(b) {
+    if (!b) return '';
+    if (b>1e9) return (b/1e9).toFixed(1)+' GB';
+    if (b>1e6) return (b/1e6).toFixed(1)+' MB';
+    return (b/1e3).toFixed(0)+' KB';
+  }
+  function fmtViews(n) {
+    if (!n) return '—';
+    if (n>1e9) return (n/1e9).toFixed(1)+'B';
+    if (n>1e6) return (n/1e6).toFixed(1)+'M';
+    if (n>1e3) return (n/1e3).toFixed(1)+'K';
+    return n;
+  }
+
+  // ── Fetch Info ────────────────────────────────────────────────────────
+  async function fetchInfo() {
+    const url = document.getElementById('url-input').value.trim();
+    if (!url) { showErr('Paste a YouTube URL first'); return; }
+    clearErr();
+    setStatus('Fetching...', 'spin');
+    document.getElementById('fetch-btn').disabled = true;
+    ['info-card','format-section','dl-panel'].forEach(hide);
+
+    try {
+      const res = await fetch('/api/get_url', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({url})
+      });
+      const data = await res.json();
+      if (data.error) { showErr(data.error); return; }
+      renderInfo(data);
+      setStatus('Got ' + data.formats.length + ' formats', 'ok');
+    } catch(e) {
+      showErr('Server error: ' + e.message);
+    } finally {
+      document.getElementById('fetch-btn').disabled = false;
+    }
+  }
+
+  function renderInfo(data) {
+    document.getElementById('thumb').src = data.thumbnail || '';
+    document.getElementById('vtitle').textContent = data.title;
+    document.getElementById('m-channel').textContent = data.uploader || '—';
+    document.getElementById('m-dur').textContent = fmtDur(data.duration);
+    document.getElementById('m-views').textContent = fmtViews(data.view_count);
+    show('info-card');
+    allFormats = data.formats || [];
+    renderFormats();
+    show('format-section');
+  }
+
+  // ── Formats ───────────────────────────────────────────────────────────
+  function switchTab(tab, btn) {
+    activeTab = tab;
+    selectedFmt = null;
+    hide('dl-panel');
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderFormats();
+  }
+
+  function renderFormats() {
+    const grid = document.getElementById('fmt-grid');
+    grid.innerHTML = '';
+    const list = allFormats.filter(f => f.type === activeTab);
+
+    if (!list.length) {
+      grid.innerHTML = `<span style="font-size:.75rem;color:var(--muted)">No ${activeTab} formats available.</span>`;
+      return;
+    }
+
+    list.forEach(fmt => {
+      const el = document.createElement('div');
+      el.className = 'fmt-card' + (selectedFmt?.url === fmt.url ? ' active' : '');
+      el.onclick = () => selectFmt(fmt);
+
+      let badgeClass = fmt.type === 'audio' ? 'badge-audio' : fmt.combined ? 'badge-combined' : 'badge-video';
+      let badgeText = fmt.type === 'audio' ? 'audio' : fmt.combined ? 'combined' : 'video only';
+
+      el.innerHTML = `
+        <span class="badge ${badgeClass}">${badgeText}</span>
+        <span class="fmt-name">${fmt.label}</span>
+        ${fmt.filesize ? `<span class="fmt-size">~${fmtSize(fmt.filesize)}</span>` : ''}
+      `;
+      grid.appendChild(el);
+    });
+
+    // Show notice if video-only formats exist in video tab
+    const hasVideoOnly = allFormats.filter(f => f.type === 'video' && !f.combined).length > 0;
+    document.getElementById('notice').style.display = (activeTab === 'video' && hasVideoOnly) ? 'block' : 'none';
+  }
+
+  function selectFmt(fmt) {
+    selectedFmt = fmt;
+    renderFormats();
+
+    // Set up download panel
+    const title = document.getElementById('vtitle').textContent;
+    const ext = fmt.ext || 'mp4';
+    const filename = title.replace(/[\\/*?:"<>|]/g, '_').slice(0, 80) + '.' + ext;
+
+    document.getElementById('dl-sel').textContent = fmt.label;
+    const link = document.getElementById('dl-link');
+    link.href = fmt.url;
+    link.setAttribute('download', filename);
+
+    show('dl-panel');
+    startExpireTimer();
+
+    // Scroll to dl panel
+    document.getElementById('dl-panel').scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  // ── Expire Timer ──────────────────────────────────────────────────────
+  function startExpireTimer() {
+    if (expireTimer) clearInterval(expireTimer);
+    expireSeconds = 360; // 6 min conservative estimate
+    updateExpireDisplay();
+    expireTimer = setInterval(() => {
+      expireSeconds--;
+      updateExpireDisplay();
+      if (expireSeconds <= 0) {
+        clearInterval(expireTimer);
+        document.getElementById('expire-time').textContent = 'EXPIRED';
+        document.getElementById('expire-time').style.color = 'var(--accent2)';
+        document.getElementById('expire-fill').style.width = '0%';
+        document.getElementById('dl-link').style.opacity = '0.4';
+      }
+    }, 1000);
+  }
+
+  function updateExpireDisplay() {
+    const m = Math.floor(expireSeconds / 60);
+    const s = expireSeconds % 60;
+    document.getElementById('expire-time').textContent = `${m}:${String(s).padStart(2,'0')}`;
+    document.getElementById('expire-fill').style.width = (expireSeconds / 360 * 100) + '%';
+  }
+
+  function handleDownload(e) {
+    if (expireSeconds <= 0) {
+      e.preventDefault();
+      showErr('Link expired — please re-fetch the video.');
+    }
+    // else browser​​​​​​​​​​​​​​​​
