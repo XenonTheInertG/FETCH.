@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/get_url.py": {
+    "api/*.py": {
       "maxDuration": 30
     }
   }
